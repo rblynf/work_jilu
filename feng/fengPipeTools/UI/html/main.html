@@ -1,0 +1,46 @@
+ <!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="x-ua-compatible" content="IE=9">
+	<title>风管连线-主界面</title>
+	<link rel="stylesheet" href="../css/lightSet.css">
+	<script type="text/javascript" src="../Js/jquery-2.2.4.min.js"></script>
+</head>
+<body>
+	<div id = "steel_main">
+		项目名称 
+		<input id="project_name" type="text" value="">
+		&nbsp&nbsp&nbsp&nbsp 单位：mm
+	</div>
+	<br/>
+	<div id="container">
+		<div class="setAttributes">
+			<div>
+				&nbsp&nbsp	几点连线:
+				<input type="text" onblur="is_num(this)" id="assign" name="assign" value="2"><br/>
+				<br/>
+				&nbsp&nbsp 离地高度:
+				<input type="text" onblur="is_num(this)" id="distance1" name="distance1"><br/>
+				&nbsp&nbsp 离墙距离:
+				<input type="text" onblur="is_num(this)" id="distance2" name="distance2"><br/>
+				&nbsp&nbsp 连线方向:
+				<select id="attachment_direction" >
+					<option>x轴方向</option>
+					<option>y轴方向</option>
+				</select>
+		</div>
+		
+		<br/><br/>
+		 &nbsp&nbsp
+		<input type="button" value="连线" id="link_btn" onclick="link_line()"> &nbsp&nbsp&nbsp&nbsp
+		<input type="button" value="设置" id="set_btn" onclick="back_light()"> &nbsp&nbsp&nbsp&nbsp
+		<input type="button" value="取消" id="cancel_btn" onclick="close_lightSet()">
+	</div>
+
+
+	
+<script type="text/javascript" src="../js/index.js"></script>
+<script type="text/javascript" src="../js/dfc.min.js"></script>
+</body>
+</html>

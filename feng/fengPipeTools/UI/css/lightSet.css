@@ -1,0 +1,132 @@
+/*公共样式*/
+*{
+	margin: 0;
+	padding: 0;
+}
+body{
+	background: #F0F0F0;
+	overflow: hidden;
+}
+li{
+	list-style: none;
+}
+a{
+	text-decoration: none;
+	color: #000;
+}
+.left{
+	float: left;
+}
+.right{
+	float: right;
+}
+#steel_main{
+	width:100%;
+	height:30px;
+	line-height:40px;
+	margin-left: 15px;
+}
+#steel_main input{
+	width:118px;
+	height:20px;
+	border:none;
+	margin-left:10px;
+	outline:1px solid gray;
+}
+/*主体部分*/
+#container{
+	/*margin:0 12px;
+	padding-top:12px; */
+	margin:2px;
+	width:625px;
+	overflow: hidden;
+}
+#container>div{
+	float:left;
+	border-top: none;
+	border-bottom: none;
+}
+#HD_loop{
+	width:57px;
+	font-weight: 600;
+}
+#HD_number{
+	width:60px;
+	margin-left: -1px;
+}
+#HD_unit{
+	width:160px;
+	height:20px;
+	margin-left:250px;
+	display: inline;
+	font-weight: 600;
+}
+.HD_delete{
+	width:30px;
+	height:20px;
+	padding-top:1px;
+	margin-left:-4px;
+	border:none;
+	outline:1px solid gray;
+}
+.HD_sel{
+	width:89px !important;
+}
+.lightSet{
+	height: 136px;
+	border: 1px solid #aaa;
+	border-right: 0;
+	padding:0 12px; 
+	border-left: 0;
+}
+.lightSet div{
+	margin-top: 12px;
+	margin-bottom: 12px;
+}
+.lightSet input{
+	width: 118px;
+	height: 20px;
+	outline: none;
+	border: 1px solid gray;
+	margin-left: 10px;
+}
+.lightSet select{
+	width: 120px;
+	height: 22px;
+	outline: none;
+	border: 1px solid gray;
+	padding: 1px;
+	margin-left: 10px;
+}
+#HD_zdy{
+	width:87px;
+	height:20px;
+	display:none;
+	border:none;
+	outline:1px solid gray;
+}
+
+#lightSet_img{
+	width:106px;
+	height:124px;
+	margin-top: 12px;
+}
+#HD_imgSet{
+	width:106px;
+	height:124px;
+}
+#lightSet_btns{
+	margin-top:6px;
+	height: 124px;
+	border:1px solid #aaa;
+	border-left: 0;
+	border-right: 0;
+}
+#lightSet_btns input{
+	width: 50px;
+	height: 22px;
+	border: 1px solid gray;
+	text-align: center;
+	margin:6px 12px;
+	cursor: pointer;
+}

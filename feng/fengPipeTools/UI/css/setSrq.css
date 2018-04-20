@@ -1,0 +1,31 @@
+body{
+	overflow:inherit;
+}
+#HD_small_body{
+	height:100%;
+}
+#HD_setting{
+	cursor: pointer;
+}
+.HD_setting{
+	width:100%;
+	height:30px;
+	background-color:white;
+}
+.HD_setting ul{
+	width:555px;
+}
+.HD_setting li{
+	width:109px;
+	height:30px;
+	line-height:30px;
+	text-align:center;
+	float: left;
+}
+.HD_setting select{
+	width:90px;
+	height:20px;
+	border:0px;
+	padding:1px;
+	outline:1px solid gray;
+}

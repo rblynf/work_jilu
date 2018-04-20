@@ -1,0 +1,118 @@
+body{
+	overflow:inherit;
+}
+#HD_small_body{
+	height:100%;
+}
+#HD_setting{
+	cursor: pointer;
+}
+.HD_setting{
+	width:100%;
+	height:30px;
+	background-color:white;
+}
+.HD_setting ul{
+	width:555px;
+}
+.HD_setting li{
+	width:109px;
+	height:30px;
+	line-height:30px;
+	text-align:center;
+	float: left;
+}
+.HD_setting select{
+	width:90px;
+	height:20px;
+	border:0px;
+	padding:1px;
+	outline:1px solid gray;
+}
+#set_thick{
+	width:90px;
+	height:20px;
+	border:0px;
+	outline:1px solid gray;
+}
+/* #color_div .Preview{
+	border:1px solid red;
+	position:relative;
+	top:25px;
+} */
+#color_div .Hue{
+	margin-top: 30px !important;
+}
+#set_parameter{
+	cursor:pointer;
+}
+
+.HD_srqSetting{
+	width:770px;
+	height:40px;
+	background-color:#f0f0f0;
+	margin-top: 10px;
+	margin-left: 4px;
+}
+.HD_srqSetting input[type='checkbox']{
+	width:15px;
+	height:15px;
+	margin-top: 1px;
+}
+.HD_srqSetting li{
+	float:left;
+}
+.HD_cross{
+	width:340px;
+}
+.HD_cross input{
+	width:90px;
+	height:20px;
+	border:none;
+	padding-left:1px;
+	outline:1px solid gray;
+}
+.HD_span{
+	width:33px;
+	height:20px;
+	outline:1px solid gray;
+	border:none;
+}
+.HD_origin{
+	width:180px;
+	height:20px;
+}
+.HD_origin input{
+	width:90px;
+	height:20px;
+	border:0px;
+	outline:1px solid gray;
+}
+.HD_finish{
+	width:180px;
+	height:20px;
+}
+.HD_finish input{
+	width:90px;
+	height:20px;
+	border:0px;
+	outline:1px solid gray;
+}
+.HD_srqFirst{
+	height:20px;
+	margin-bottom:14px;
+	
+}
+.HD_srqFirst button{
+	position: relative;
+	top:-1px;
+}
+.HD_srqSet_submit input[type='button']{
+	width:50px;
+	height:20px;
+	border:none;
+	outline:1px solid gray;
+}
+
+
+
