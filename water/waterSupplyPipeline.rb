@@ -186,14 +186,28 @@ class WaterSupplyPipeline
 		@wallFaceList = [] 
 		
 		@wallFaceList = find_wall_faces_2()
-		# p @wallFaceList.size
+
+        #实际组外墙的坐标
+        @wallFaceListRel = []
+        @wallFaceList.each{|fItem|
+            fgroup = find_max_group_by_ent(fItem)
+            face1 = 0
+            if fgroup != 0
+                face1 = transform_face(fItem, fgroup)
+            else
+                face1 = fItem
+            end 
+            @wallFaceListRel << face1
+        }
+
+		
 		#将有冷热水的设备找出冷热水口的位置（规则靠墙最近的一边为背面，正面为左热右冷）
 		@allDeviceClosestResult = {}
 		if @coldEnts.size > 0
 			@coldEnts.each{|item|
 				centerPoint = find_center_in_group(item["ent"],normal,item["high"],1)
 				# 找出附近1米内的墙（1000.mm）,再找出最近的
-				closestResults = get_closest_wallFace_result(centerPoint, @wallFaceList, 1000.mm)
+				closestResults = get_closest_wallFace_result(centerPoint, @wallFaceListRel, 1000.mm)
 				if closestResults.length > 0 
 					@allDeviceClosestResult[item] = closestResults
 				end
@@ -265,64 +279,72 @@ class WaterSupplyPipeline
 		# p "@hotDevicePointList: "
 		# show_mm_points(@hotDevicePointList)
 	
-        if @coldDevicePointList.length >= 2
-			get_coldorhot_link_points(@coldDevicePointList,"cold",high,"器具点多")
-		end 
-        #  p "@coldLines"
-        # @coldLines.each{|items|
-        #     show_mm_points(items)
-        # }
-		#将立管靠墙
-		@coldLines = stand_against_wall(@coldLines)
-        #为确保线段表示最优，再做次细分
-        @coldLines = refine_lines(@coldLines)
+        begin 
+            if @coldDevicePointList.length >= 2
+    			get_coldorhot_link_points(@coldDevicePointList,"cold",high)
+    		end 
 
-		@coldLines.each{|citems|
-			@coldLinesPoint << citems[0] if !@coldLinesPoint.include?(citems[0])
-			@coldLinesPoint << citems[1] if !@coldLinesPoint.include?(citems[1])
-		}
-		if @hotDevicePointList.length >= 2
-			get_coldorhot_link_points(@hotDevicePointList,"hot",high,"器具点多")
-		end 
-        # p "@hotLines11111"
-        # @hotLines.each{|items|
-        #     show_mm_points(items)
-        # }
-		@hotLines = stand_against_wall(@hotLines)
+    		#将立管靠墙
+    		@coldLines = stand_against_wall(@coldLines)
+            #为确保线段表示最优，再做次细分
+            @coldLines = refine_lines(@coldLines)
 
-        #为确保线段表示最优，再做次细分
-        @hotLines = refine_lines(@hotLines)
+    		@coldLines.each{|citems|
+    			@coldLinesPoint << citems[0] if !@coldLinesPoint.include?(citems[0])
+    			@coldLinesPoint << citems[1] if !@coldLinesPoint.include?(citems[1])
+    		}
+    		if @hotDevicePointList.length >= 2
+    			get_coldorhot_link_points(@hotDevicePointList,"hot",high)
+    		end 
+    		@hotLines = stand_against_wall(@hotLines)
 
-		@hotLines.each{|hitems|
-			@hotLinesPoint << hitems[0] if !@hotLinesPoint.include?(hitems[0])
-			@hotLinesPoint << hitems[1] if !@hotLinesPoint.include?(hitems[1])
-		}
-        
-		#画线
-        #画在组内
-        @lineGroupEnt = @ents.add_group.entities
-		draw_line_by_segments(@coldLines,"cold")
-		draw_line_by_segments(@hotLines,"hot")
-		
-		#标管径
-		@segmentDiameterHash = {} #线段-管径 哈希数据
-		if @coldLines.size > 0
-		    draw_pipe_diameter("cold")
-		end 
-		if @hotLines.size > 0
-			draw_pipe_diameter("hot")
-		end 
-		# #将管径写进线段属性中
-		@segmentDiameterHash.each{|key,value|
-			#找到key对应的Edge实体
-			edgeEnt = find_edge_ent_by_segment(key,@lineGroupEnt)
-			edgeEnt.set_attribute('attributedictionaryname', 'pipeDiameter', "#{value}") if edgeEnt != 0
-		}
-        # @segmentDiameterHash.each{|key,value|
-        #     p "key : "
-        #     show_mm_points(key)
-        # }
-		
+            #为确保线段表示最优，再做次细分
+            @hotLines = refine_lines(@hotLines)
+
+    		@hotLines.each{|hitems|
+    			@hotLinesPoint << hitems[0] if !@hotLinesPoint.include?(hitems[0])
+    			@hotLinesPoint << hitems[1] if !@hotLinesPoint.include?(hitems[1])
+    		}
+            
+            #画在组内
+            @lineGroupEnt = @ents.add_group.entities
+    		draw_line_by_segments(@coldLines,"cold")
+    		draw_line_by_segments(@hotLines,"hot")
+    		
+    		#标管径
+    		@segmentDiameterHash = {} #线段-管径 哈希数据
+    		if @coldLines.size > 0
+    		    draw_pipe_diameter("cold")
+    		end 
+    		if @hotLines.size > 0
+    			draw_pipe_diameter("hot")
+    		end 
+    		# #将管径写进线段属性中
+    		@segmentDiameterHash.each{|key,value|
+    			#找到key对应的Edge实体
+    			edgeEnt = find_edge_ent_by_segment(key,@lineGroupEnt)
+    			edgeEnt.set_attribute('attributedictionaryname', 'pipeDiameter', "#{value}") if edgeEnt != 0
+    		}
+        rescue Exception => e 
+
+        ensure 
+            #删除@wallFaceListRel
+            delEdges = []
+            @wallFaceListRel.each{|item|
+                item.edges.each{|item2|
+                    delEdges << item2 if !delEdges.include?(item2)
+                }
+            }
+            delEdges.each{|item|
+                begin
+                    item.erase!
+                rescue Exception => ex 
+                    # p ex.message
+                    next
+                end 
+            }
+        end 
+
 		@model.commit_operation 
 		
     end
@@ -444,207 +466,22 @@ class WaterSupplyPipeline
             #只有当两点在同一水平面时才考虑穿墙问题
             if pitems[0][2] == pitems[1][2]
                 vec = Geom::Vector3d.new(pitems[1][0]-pitems[0][0],pitems[1][1]-pitems[0][1],pitems[1][2]-pitems[0][2])
-                line = [pitems[0],vec]
+                line = [pitems[0],vec]   
 
-                # @attributeHashList.each{|aItem|
-                #     if aItem["name"].to_s == "墙"
-                #         aItem["ent"].entities.each{|item2|
-                #             if item2.typename == "Face"
-                #                 if (item2.normal.dot(vec)).abs < 0.1  #只管线段与墙面平行的，垂直的不管
-                #                     face1 = item2
-                #                     fgroup = find_max_group_by_ent(item2)
-                #                     if fgroup != 0
-                #                         face1 = transform_face(item2, fgroup)
-                #                     end 
-                #                     distance = distance_from_segement_to_face([pitems[0],pitems[1]], face1)
-                #                     if distance > 0.1.mm && distance < distanceFromWall
-                #                         distoff = distanceFromWall - distance
-                #                         if  judge_two_vectors_parallel(vec, @vec_l)         
-                #                             pitems0_vi = [pitems[0][0] + @vec_w_xleng*distoff, pitems[0][1] + @vec_w_yleng*distoff, pitems[0][2] + @vec_w_zleng*distoff]
-                #                             pitems1_vi = [pitems[1][0] + @vec_w_xleng*distoff, pitems[1][1] + @vec_w_yleng*distoff, pitems[1][2] + @vec_w_zleng*distoff]
-                #                             distance_vi = distance_from_segement_to_face([pitems0_vi,pitems1_vi], face1)
-                                            
-                #                             #移动后点和原来端点在墙的同一边
-                #                             line2 = [pitems[0],item2.normal]
-                #                             plane = [transform_obj(item2.vertices[0].position,fgroup),item2.normal]
-                #                             point_ins = Geom.intersect_line_plane(line2, plane)
-                                            
-                #                             vecpp = Geom::Vector3d.new(point_ins[0]-pitems[0][0],point_ins[1]-pitems[0][1],point_ins[2]-pitems[0][2])
-                #                             vecpp_vi = Geom::Vector3d.new(point_ins[0]-pitems0_vi[0],point_ins[1]-pitems0_vi[1],point_ins[2]-pitems0_vi[2])
-
-                #                             #管线不能重合 
-                #                             if type == "hot"
-                #                                 flag = false
-                #                                 @coldLinesPoint.each{|item|
-                #                                     flag = judge_point_in_segment(item,pitems0_vi,pitems1_vi)
-                #                                     break if flag 
-                #                                 }
-                #                                 if !flag
-                #                                     @coldLines.each{|item|
-                #                                         flag2, flag3 = false, false
-                #                                         flag2 = judge_point_in_segment(pitems0_vi,item[0],item[1])
-                #                                         flag3 = judge_point_in_segment(pitems1_vi,item[0],item[1])
-                #                                         if flag2 || flag3
-                #                                             flag = true
-                #                                             break
-                #                                         end 
-                #                                     }
-                #                                     end
-                #                                 if flag
-                #                                     pitems0_vi = [pitems[0][0] + @vec_w_xleng*(distoff+distanceFromWall), pitems[0][1] + @vec_w_yleng*(distoff+distanceFromWall), pitems[0][2] + @vec_w_zleng*(distoff+distanceFromWall)]
-                #                                     pitems1_vi = [pitems[1][0] + @vec_w_xleng*(distoff+distanceFromWall), pitems[1][1] + @vec_w_yleng*(distoff+distanceFromWall), pitems[1][2] + @vec_w_zleng*(distoff+distanceFromWall)]
-                #                                 end 
-                #                             end
-                #                             if vecpp.length > 1.mm && vecpp_vi.length > 1.mm
-                #                                 if !vecpp.samedirection?(vecpp_vi) || (vecpp.samedirection?(vecpp_vi) && distance_vi < distance)
-                #                                     pitems0_vi = [pitems[0][0] - @vec_w_xleng*distoff, pitems[0][1] - @vec_w_yleng*distoff, pitems[0][2] - @vec_w_zleng*distoff]
-                #                                     pitems1_vi = [pitems[1][0] - @vec_w_xleng*distoff, pitems[1][1] - @vec_w_yleng*distoff, pitems[1][2] - @vec_w_zleng*distoff]
-                #                                     #管线不能重合
-                #                                     if type == "hot"
-                #                                         flag = false
-                #                                         @coldLinesPoint.each{|item|
-                #                                             flag = judge_point_in_segment(item,pitems0_vi,pitems1_vi)
-                #                                             break if flag
-                #                                         }
-                #                                         if !flag
-                #                                             @coldLines.each{|item|
-                #                                                 flag2, flag3 = false, false
-                #                                                 flag2 = judge_point_in_segment(pitems0_vi,item[0],item[1])
-                #                                                 flag3 = judge_point_in_segment(pitems1_vi,item[0],item[1])
-                #                                                 if flag2 || flag3
-                #                                                     flag = true
-                #                                                     break
-                #                                                 end 
-                #                                             }
-                #                                         end
-                #                                         if flag
-                #                                             pitems0_vi = [pitems[0][0] - @vec_w_xleng*(distoff+distanceFromWall), pitems[0][1] - @vec_w_yleng*(distoff+distanceFromWall), pitems[0][2] - @vec_w_zleng*(distoff+distanceFromWall)]
-                #                                             pitems1_vi = [pitems[1][0] - @vec_w_xleng*(distoff+distanceFromWall), pitems[1][1] - @vec_w_yleng*(distoff+distanceFromWall), pitems[1][2] - @vec_w_zleng*(distoff+distanceFromWall)]
-                #                                         end 
-                #                                     end
-                #                                 end 
-                #                             end
-                #                         else
-                #                             pitems0_vi = [pitems[0][0] + @vec_l_xleng*distoff, pitems[0][1] + @vec_l_yleng*distoff, pitems[0][2] + @vec_l_zleng*distoff]
-                #                             pitems1_vi = [pitems[1][0] + @vec_l_xleng*distoff, pitems[1][1] + @vec_l_yleng*distoff, pitems[1][2] + @vec_l_zleng*distoff]
-                #                             distance_vi = distance_from_segement_to_face([pitems0_vi,pitems1_vi], face1)
-                                            
-                #                             #移动后点和原来端点在墙的同一边
-                #                             line2 = [pitems[0],item2.normal]
-                #                             plane = [transform_obj(item2.vertices[0].position, fgroup),item2.normal]
-                #                             point_ins = Geom.intersect_line_plane(line2, plane)
-                #                             vecpp = Geom::Vector3d.new(point_ins[0]-pitems[0][0],point_ins[1]-pitems[0][1],point_ins[2]-pitems[0][2])
-                #                             vecpp_vi = Geom::Vector3d.new(point_ins[0]-pitems0_vi[0],point_ins[1]-pitems0_vi[1],point_ins[2]-pitems0_vi[2])
-       
-                #                             #管线不能重合
-                #                             if type == "hot"
-                #                                 flag = false
-                #                                 @coldLinesPoint.each{|item|
-                #                                     flag = judge_point_in_segment(item,pitems0_vi,pitems1_vi)
-                #                                     break if flag 
-                #                                 }
-                #                                 if !flag
-                #                                     @coldLines.each{|item|
-                #                                         flag2, flag3 = false, false
-                #                                         flag2 = judge_point_in_segment(pitems0_vi,item[0],item[1])
-                #                                         flag3 = judge_point_in_segment(pitems1_vi,item[0],item[1])
-                #                                         if flag2 || flag3
-                #                                             flag = true
-                #                                             break
-                #                                         end 
-                #                                     }
-                #                                 end
-                #                                 if flag
-                #                                     pitems0_vi = [pitems[0][0] + @vec_l_xleng*(distoff+distanceFromWall), pitems[0][1] + @vec_l_yleng*(distoff+distanceFromWall), pitems[0][2] + @vec_l_zleng*(distoff+distanceFromWall)]
-                #                                     pitems1_vi = [pitems[1][0] + @vec_l_xleng*(distoff+distanceFromWall), pitems[1][1] + @vec_l_yleng*(distoff+distanceFromWall), pitems[1][2] + @vec_l_zleng*(distoff+distanceFromWall)]
-                #                                 end 
-                #                             end
-                #                             if vecpp.length > 1.mm && vecpp_vi.length > 1.mm
-                #                                 if !vecpp.samedirection?(vecpp_vi) || (vecpp.samedirection?(vecpp_vi) && distance_vi < distance)
-                #                                     pitems0_vi = [pitems[0][0] - @vec_l_xleng*distoff, pitems[0][1] - @vec_l_yleng*distoff, pitems[0][2] - @vec_l_zleng*distoff]
-                #                                     pitems1_vi = [pitems[1][0] - @vec_l_xleng*distoff, pitems[1][1] - @vec_l_yleng*distoff, pitems[1][2] - @vec_l_zleng*distoff]
-                #                                     #管线不能重合
-                #                                     if type == "hot"
-                #                                         flag = false
-                #                                         @coldLinesPoint.each{|item|
-                #                                             flag = judge_point_in_segment(item,pitems0_vi,pitems1_vi)
-                #                                             break if flag 
-                #                                         }
-                #                                         if !flag
-                #                                             @coldLines.each{|item|
-                #                                                 flag2, flag3 = false, false
-                #                                                 flag2 = judge_point_in_segment(pitems0_vi,item[0],item[1])
-                #                                                 flag3 = judge_point_in_segment(pitems1_vi,item[0],item[1])
-                #                                                 if flag2 || flag3
-                #                                                     flag = true
-                #                                                     break
-                #                                                 end 
-                #                                             }
-                #                                         end
-                #                                         if flag
-                #                                             pitems0_vi = [pitems[0][0] - @vec_l_xleng*(distoff+distanceFromWall), pitems[0][1] - @vec_l_yleng*(distoff+distanceFromWall), pitems[0][2] - @vec_l_zleng*(distoff+distanceFromWall)]
-                #                                             pitems1_vi = [pitems[1][0] - @vec_l_xleng*(distoff+distanceFromWall), pitems[1][1] - @vec_l_yleng*(distoff+distanceFromWall), pitems[1][2] - @vec_l_zleng*(distoff+distanceFromWall)]
-                #                                         end 
-                #                                     end
-                #                                 end 
-                #                             end
-                #                         end
-
-                #                         #坐标替换
-                #                         if !changedpointList.include?(pitems[0]) && !changedpointList.include?(pitems[1])
-                #                             changedpointList << pitems[0]
-                #                             changedpointList << pitems[1]
-                #                             points.each{|pitem|
-                #                                 offset = points.index(pitem)
-                #                                 if (pitem.distance pitems[0]) < 1.mm
-                #                                     points.delete_at(offset) 
-                #                                     points.insert(offset,pitems0_vi)
-                #                                 elsif (pitem.distance pitems[1]) < 1.mm
-                #                                     points.delete_at(offset) 
-                #                                     points.insert(offset,pitems1_vi)
-                #                                 end
-                #                             }
-                #                         else
-                #                             pipeline_migrate_distance_from_wall(points, distanceFromWall,type)
-                #                         end
-                #                     end 
-                                
-                #                     #删除面
-                #                     if face1 != item2   
-                #                         begin
-                #                             face1.edges.each{|eItem|
-                #                                 eItem.erase!
-                #                             }
-                #                         rescue Exception => e 
-                #                             # p e.message
-                #                         end 
-                #                     end 
-                #                 end
-                #             end
-                #         }
-                #     end
-                # }     
-
-
-                @wallFaceList.each{|item2|
-                    if item2.typename == "Face"
-                        if (item2.normal.dot(vec)).abs < 0.1  #只管线段与墙面平行的，垂直的不管
-                            face1 = item2
-                            fgroup = find_max_group_by_ent(item2)
-                            if fgroup != 0
-                                face1 = transform_face(item2, fgroup)
-                            end 
-                            distance = distance_from_segement_to_face([pitems[0],pitems[1]], face1)
+                @wallFaceListRel.each{|item|
+                    if item.typename == "Face"
+                        if (item.normal.dot(vec)).abs < 0.1  #只管线段与墙面平行的，垂直的不管
+                            distance = distance_from_segement_to_face([pitems[0],pitems[1]], item)
                             if distance > 0.1.mm && distance < distanceFromWall
                                 distoff = distanceFromWall - distance
                                 if  judge_two_vectors_parallel(vec, @vec_l)         
                                     pitems0_vi = [pitems[0][0] + @vec_w_xleng*distoff, pitems[0][1] + @vec_w_yleng*distoff, pitems[0][2] + @vec_w_zleng*distoff]
                                     pitems1_vi = [pitems[1][0] + @vec_w_xleng*distoff, pitems[1][1] + @vec_w_yleng*distoff, pitems[1][2] + @vec_w_zleng*distoff]
-                                    distance_vi = distance_from_segement_to_face([pitems0_vi,pitems1_vi], face1)
+                                    distance_vi = distance_from_segement_to_face([pitems0_vi,pitems1_vi], item)
                                     
                                     #移动后点和原来端点在墙的同一边
-                                    line2 = [pitems[0],item2.normal]
-                                    plane = [transform_obj(item2.vertices[0].position,fgroup),item2.normal]
+                                    line2 = [pitems[0],item.normal]
+                                    plane = [item.vertices[0].position,item.normal]
                                     point_ins = Geom.intersect_line_plane(line2, plane)
                                     
                                     vecpp = Geom::Vector3d.new(point_ins[0]-pitems[0][0],point_ins[1]-pitems[0][1],point_ins[2]-pitems[0][2])
@@ -653,15 +490,15 @@ class WaterSupplyPipeline
                                     #管线不能重合 
                                     if type == "hot"
                                         flag = false
-                                        @coldLinesPoint.each{|item|
-                                            flag = judge_point_in_segment(item,pitems0_vi,pitems1_vi)
+                                        @coldLinesPoint.each{|item2|
+                                            flag = judge_point_in_segment(item2,pitems0_vi,pitems1_vi)
                                             break if flag 
                                         }
                                         if !flag
-                                            @coldLines.each{|item|
+                                            @coldLines.each{|items|
                                                 flag2, flag3 = false, false
-                                                flag2 = judge_point_in_segment(pitems0_vi,item[0],item[1])
-                                                flag3 = judge_point_in_segment(pitems1_vi,item[0],item[1])
+                                                flag2 = judge_point_in_segment(pitems0_vi,items[0],items[1])
+                                                flag3 = judge_point_in_segment(pitems1_vi,items[0],items[1])
                                                 if flag2 || flag3
                                                     flag = true
                                                     break
@@ -680,15 +517,15 @@ class WaterSupplyPipeline
                                             #管线不能重合
                                             if type == "hot"
                                                 flag = false
-                                                @coldLinesPoint.each{|item|
-                                                    flag = judge_point_in_segment(item,pitems0_vi,pitems1_vi)
+                                                @coldLinesPoint.each{|item2|
+                                                    flag = judge_point_in_segment(item2,pitems0_vi,pitems1_vi)
                                                     break if flag
                                                 }
                                                 if !flag
-                                                    @coldLines.each{|item|
+                                                    @coldLines.each{|items|
                                                         flag2, flag3 = false, false
-                                                        flag2 = judge_point_in_segment(pitems0_vi,item[0],item[1])
-                                                        flag3 = judge_point_in_segment(pitems1_vi,item[0],item[1])
+                                                        flag2 = judge_point_in_segment(pitems0_vi,items[0],items[1])
+                                                        flag3 = judge_point_in_segment(pitems1_vi,items[0],items[1])
                                                         if flag2 || flag3
                                                             flag = true
                                                             break
@@ -705,11 +542,11 @@ class WaterSupplyPipeline
                                 else
                                     pitems0_vi = [pitems[0][0] + @vec_l_xleng*distoff, pitems[0][1] + @vec_l_yleng*distoff, pitems[0][2] + @vec_l_zleng*distoff]
                                     pitems1_vi = [pitems[1][0] + @vec_l_xleng*distoff, pitems[1][1] + @vec_l_yleng*distoff, pitems[1][2] + @vec_l_zleng*distoff]
-                                    distance_vi = distance_from_segement_to_face([pitems0_vi,pitems1_vi], face1)
+                                    distance_vi = distance_from_segement_to_face([pitems0_vi,pitems1_vi], item)
                                     
                                     #移动后点和原来端点在墙的同一边
-                                    line2 = [pitems[0],item2.normal]
-                                    plane = [transform_obj(item2.vertices[0].position, fgroup),item2.normal]
+                                    line2 = [pitems[0],item.normal]
+                                    plane = [item.vertices[0].position,item.normal]
                                     point_ins = Geom.intersect_line_plane(line2, plane)
                                     vecpp = Geom::Vector3d.new(point_ins[0]-pitems[0][0],point_ins[1]-pitems[0][1],point_ins[2]-pitems[0][2])
                                     vecpp_vi = Geom::Vector3d.new(point_ins[0]-pitems0_vi[0],point_ins[1]-pitems0_vi[1],point_ins[2]-pitems0_vi[2])
@@ -717,15 +554,15 @@ class WaterSupplyPipeline
                                     #管线不能重合
                                     if type == "hot"
                                         flag = false
-                                        @coldLinesPoint.each{|item|
-                                            flag = judge_point_in_segment(item,pitems0_vi,pitems1_vi)
+                                        @coldLinesPoint.each{|item2|
+                                            flag = judge_point_in_segment(item2,pitems0_vi,pitems1_vi)
                                             break if flag 
                                         }
                                         if !flag
-                                            @coldLines.each{|item|
+                                            @coldLines.each{|items|
                                                 flag2, flag3 = false, false
-                                                flag2 = judge_point_in_segment(pitems0_vi,item[0],item[1])
-                                                flag3 = judge_point_in_segment(pitems1_vi,item[0],item[1])
+                                                flag2 = judge_point_in_segment(pitems0_vi,items[0],items[1])
+                                                flag3 = judge_point_in_segment(pitems1_vi,items[0],items[1])
                                                 if flag2 || flag3
                                                     flag = true
                                                     break
@@ -744,15 +581,15 @@ class WaterSupplyPipeline
                                             #管线不能重合
                                             if type == "hot"
                                                 flag = false
-                                                @coldLinesPoint.each{|item|
-                                                    flag = judge_point_in_segment(item,pitems0_vi,pitems1_vi)
+                                                @coldLinesPoint.each{|item2|
+                                                    flag = judge_point_in_segment(item2,pitems0_vi,pitems1_vi)
                                                     break if flag 
                                                 }
                                                 if !flag
-                                                    @coldLines.each{|item|
+                                                    @coldLines.each{|items|
                                                         flag2, flag3 = false, false
-                                                        flag2 = judge_point_in_segment(pitems0_vi,item[0],item[1])
-                                                        flag3 = judge_point_in_segment(pitems1_vi,item[0],item[1])
+                                                        flag2 = judge_point_in_segment(pitems0_vi,items[0],items[1])
+                                                        flag3 = judge_point_in_segment(pitems1_vi,items[0],items[1])
                                                         if flag2 || flag3
                                                             flag = true
                                                             break
@@ -785,17 +622,6 @@ class WaterSupplyPipeline
                                 else
                                     pipeline_migrate_distance_from_wall(points, distanceFromWall,type)
                                 end
-                            end 
-                        
-                            #删除面
-                            if face1 != item2   
-                                begin
-                                    face1.edges.each{|eItem|
-                                        eItem.erase!
-                                    }
-                                rescue Exception => e 
-                                    # p e.message
-                                end 
                             end 
                         end
                     end
@@ -833,6 +659,13 @@ class WaterSupplyPipeline
             point_ins_2 = Geom.intersect_line_plane(line3, plane)
             line4 = [segment[1],face.normal]
             point_ins_3 = Geom.intersect_line_plane(line4, plane)
+            leftPointCenter = Geom.linear_combination(0.25,segment[0],0.75,segment[1])
+            line5 = [leftPointCenter,face.normal]
+            point_ins_4 = Geom.intersect_line_plane(line5, plane)
+            rightPointCenter = Geom.linear_combination(0.75,segment[0],0.25,segment[1])
+            line6 = [rightPointCenter,face.normal]
+            point_ins_5 = Geom.intersect_line_plane(line6, plane)
+
             wallpoint = face.vertices[0].position
             #取平面端点（和线同一高度）
             wallpoint = [wallpoint[0],wallpoint[1],segment[0][2]]
@@ -843,7 +676,11 @@ class WaterSupplyPipeline
             elsif face.classify_point(point_ins_2) == 1 || face.classify_point(point_ins_2) == 2 || face.classify_point(point_ins_2) == 4
                 distance = segment[0].distance point_ins_2
             elsif face.classify_point(point_ins_3) == 1 || face.classify_point(point_ins_3) == 2 || face.classify_point(point_ins_3) == 4
-                distance = segment[1].distance point_ins_2
+                distance = segment[1].distance point_ins_3
+            elsif face.classify_point(point_ins_4) == 1 || face.classify_point(point_ins_4) == 2 || face.classify_point(point_ins_4) == 4
+                distance = leftPointCenter.distance point_ins_4
+            elsif face.classify_point(point_ins_5) == 1 || face.classify_point(point_ins_5) == 2 || face.classify_point(point_ins_5) == 4
+                distance = rightPointCenter.distance point_ins_5
             elsif !point_ins_wall.nil? 
                 flag = judge_point_in_segment(point_ins_wall,segment[0],segment[1])
                 distance = point_ins_wall.distance(wallpoint) if flag
@@ -940,13 +777,11 @@ class WaterSupplyPipeline
 
 	
 	#在限定的距离内找出最近的墙面
-	def get_closest_wallFace_result(point,wallFaceList,limitedDistance)
+	def get_closest_wallFace_result(point,wallFaceListRel,limitedDistance)
 		resultList = [] #结果，point，交点point_int ,距离 , point到交点的向量
 		distance_min = limitedDistance #默认最大的最近距离
-		# @model.start_operation "face1" , true
-		wallFaceList.each{|wItem|
-			fgroup = find_max_group_by_ent(wItem)
-			item2point0 = transform_obj(wItem.vertices[0].position,fgroup)
+		wallFaceListRel.each{|wItem|
+			item2point0 = wItem.vertices[0].position
 			plane = [item2point0, Geom::Vector3d.new(wItem.normal)]
 			line = [point, wItem.normal]
 			point_int = Geom.intersect_line_plane(line, plane)
@@ -956,13 +791,8 @@ class WaterSupplyPipeline
 				distancew = point.distance point_int
 				#限定距离内的墙面才处理，否则不管
 				if distancew <= limitedDistance
-					if fgroup != 0
-						face1 = transform_face(wItem, fgroup)
-					else
-						face1 = wItem
-					end 
 					#交点在墙上
-					if face1.classify_point(point_int) == 1 || face1.classify_point(point_int) == 2 || face1.classify_point(point_int) == 4
+					if wItem.classify_point(point_int) == 1 || wItem.classify_point(point_int) == 2 || wItem.classify_point(point_int) == 4
 						#保存距离和point到交点的向量
 						if distancew <= distance_min
 							distance_min = distancew
@@ -970,16 +800,9 @@ class WaterSupplyPipeline
 							resultList = [point, point_int, distancew, vec ]
 						end 
 					end
-					if face1 != wItem
-						#删除
-						face1.edges.each{|face1Item|
-							face1Item.erase!
-						}
-					end 
 				end 
 			end
 		}
-		# @model.commit_operation
 		resultList
 	end 
 	
@@ -1240,8 +1063,7 @@ class WaterSupplyPipeline
 	
 	
 	#获得水管连线点
-	def get_coldorhot_link_points(points, type, high, linkType)
-		# @model.start_operation "Link Test", true
+	def get_coldorhot_link_points(points, type, high)
 		points_c = points.clone #先克隆一份，免得修改了实例变量
 		mainLinePointList = [] #保存主线两点
 		if type == "cold"
@@ -1268,7 +1090,7 @@ class WaterSupplyPipeline
 			pointList = []
 			if type == "cold"
                 begin
-                    timeout(20) do 
+                    timeout(10) do 
                         pointList = get_link_point(item[0],item[1],type,high)
                     end
                 rescue Exception => e 
@@ -1277,7 +1099,7 @@ class WaterSupplyPipeline
 				pointList = get_link_point_2(item[0],item[1],type,high) if pointList.size == 0
 			elsif type == "hot"
                 begin
-                    timeout(20) do 
+                    timeout(10) do 
                         pointList = get_link_point(item[0],item[1],type,high)
                     end
                 rescue Exception => e 
@@ -1389,152 +1211,12 @@ class WaterSupplyPipeline
 			}
 
 			#1直接遍历dpfList，取距离最小的，有点：耗时较少.缺陷：不是最短，且有时会连不上
-            if linkType == "器具点多"
-    			if dpfList.size > 0 
-    				d_min = dpfList[0][0]
-    				dpfList.each{|item2|
-    					d_min = item2[0] if item2[0] < d_min
-    				}
-    				linkMinFlag = true #默认连得上
-                    targetClosetPoint = 0
-    				dpfList.each{|item2|
-    					if item2[0] == d_min 
-    						targetClosetPoint = item2[1]
-    						targetClosetPoint = item2[3] if item2[2] == 1
-    						pointList = []
-    						pointList << item
-    						pointList2 = []
-    						if type == "cold"
-                                begin 
-                                    timeout(15) do 
-    							        pointList2 = get_link_point(point_vi,targetClosetPoint,type,high)
-                                    end 
-                                rescue Exception => e 
-                                    # p "33333333"
-                                end 
-    						elsif type == "hot"
-                                begin 
-                                    timeout(15) do
-    							        pointList2 = get_link_point(point_vi,targetClosetPoint,type,high)
-                                    end 
-                                rescue Exception => e 
-                                    # p "444444444"
-                                end 
-    						end
-                            begin 
-                                timeout(15) do 
-                                    pointList2 = get_link_point_2(point_vi,targetClosetPoint,type,high) if pointList2.size == 0
-                                end
-                            rescue Exception => e 
-                                # p "timeout(15)"*5
-                            end 
-    						#可能连不上
-    						if pointList2.size > 0
-    							pointList2 = pipeline_migrate_distance_from_wall(pointList2,150.mm,type)
-    							pointList.concat(pointList2)
-    							list_item2 = []
-    							pointList.each_cons(2){|pitem|
-    								#线段去重
-    								temp_list = []
-    								temp_list = remove_repeat_segment(pitem[0],pitem[1],@lineList)
-    								if temp_list != [0,0]	#有新增线段 
-    									@lineList << temp_list 
-    									# line = @ents.add_line temp_list[0], temp_list[1]
-    									
-    									#热水管用红色画线
-    									if type == "hot"
-    										# line.material = "red" 
-    									else
-    										@coldbrancheshash[item] = [] if @coldbrancheshash[item].nil?
-    										@coldbrancheshash[item] << [temp_list[0], temp_list[1]]
-    									end
-    								end
-    							}
-    						else #连不上
-    							linkMinFlag = false #最短的连不上
-                                # p "相对最近的连接不上 "
-                                # p "point_vi,targetClosetPoint"
-                                # show_mm_points([point_vi,targetClosetPoint])
-    						end 
-    						break
-    					end
-    				}
-                 
-    				if !linkMinFlag 
-    					#2比较所有线段列的长度，取最短。缺陷：耗时长. 优点:结果准确。
-    					distanceSegmentList = []
-    					dpfList.each{|item2|
-    						pointlast = item2[1]
-    						pointlast = item2[3] if item2[2] == 1
-                            next if pointlast == targetClosetPoint
-    						pointList = []
-    						pointList << item
-    						pointList2 = []
-    						if type == "cold"
-                                begin 
-                                    timeout(15) do 
-    							        pointList2 = get_link_point(point_vi,pointlast,type,high)
-                                    end 
-                                rescue Exception => e 
-                                    # p "555555555"
-                                end 
-    						elsif type == "hot"
-                                begin 
-                                    timeout(15) do
-    							        pointList2 = get_link_point(point_vi,pointlast,type,high)
-                                    end 
-                                rescue Exception => e 
-                                    # p "666666666"
-                                end 
-    						end
-    						if pointList2.size > 0 #为0说明被围了，连不上，必然不是最近的。
-    							pointList2 = pipeline_migrate_distance_from_wall(pointList2,150.mm,type)
-    							pointList.concat(pointList2)
-    							distan = 0
-    							list_item2 = []
-    							pointList.each_cons(2){|pitem|
-    								#线段去重
-    								temp_list = []
-    								temp_list = remove_repeat_segment(pitem[0],pitem[1],@lineList)
-    								if temp_list != [0,0]	#有新增线段 
-    									#保存计算所有线段的总长度
-    									distan += temp_list[0].distance temp_list[1]
-    									list_item2 << temp_list
-    								end
-    							}
-    							distanceSegmentList << [distan,list_item2]
-    						end
-    					}
-    					if distanceSegmentList.size > 0 
-    						all_segments_distance_min = distanceSegmentList[0][0]
-    						distanceSegmentList.each{|item2|
-    							all_segments_distance_min = item2[0] if item2[0] < all_segments_distance_min
-    						}
-    						distanceSegmentList.each{|items|
-    							if items[0] == all_segments_distance_min 
-    								items[1].each{|items2|
-    									@lineList << items2
-    									#先不画线
-    									# line = @ents.add_line items2[0], items2[1]
-    									if type == "hot"
-    										# line.material = "red" 
-    									else
-    										@coldbrancheshash[item] = [] if @coldbrancheshash[item].nil?
-    										@coldbrancheshash[item] << [items2[0], items2[1]]
-    									end
-    								}
-    								break
-    							end
-    						}
-                        else
-                            # p "存在某点连接不上"
-                            # show_mm_points([item])
-    					end
-    				
-    				end #linkMinFlag end 
-    			end
-            elsif linkType == "器具点少"
-                distanceSegmentList = []
+			if dpfList.size > 0 
+                #将dpfList按从近到远排序
+                dpfList = dpfList.sort_by{|v| v[0]}
+
+                #因为已排好序，故从头开始遍历，若连上则取消遍历即可
+                distanceSegmentList = [] #所有线段列的长度，取最短。缺陷：耗时长. 优点:结果准确。
                 dpfList.each{|item2|
                     pointlast = item2[1]
                     pointlast = item2[3] if item2[2] == 1
@@ -1542,11 +1224,34 @@ class WaterSupplyPipeline
                     pointList << item
                     pointList2 = []
                     if type == "cold"
-                        pointList2 = get_link_point(point_vi,pointlast,type,high)
+                        begin 
+                            timeout(10) do 
+                                pointList2 = get_link_point(point_vi,pointlast,type,high)
+                            end 
+                        rescue Exception => e 
+                            # p "3333333"
+                        end 
                     elsif type == "hot"
-                        pointList2 = get_link_point(point_vi,pointlast,type,high)
+                        begin 
+                            timeout(10) do
+                                pointList2 = get_link_point(point_vi,pointlast,type,high)
+                            end 
+                        rescue Exception => e 
+                            # p "4444444"
+                        end 
                     end
-                    if pointList2.size > 0 #为0说明备围了，连不上，必然不是最近的。
+                    if pointList2.size == 0
+                        begin 
+                            timeout(10) do 
+                                pointList2 = get_link_point_2(point_vi,pointlast,type,high) 
+                            end
+                        rescue Exception => e 
+                            # p e.message
+                            # p "55555555"*5
+                        end 
+                    end 
+                    # next if pointList2.size == 0
+                    if pointList2.size > 0 #为0说明被围了，连不上
                         pointList2 = pipeline_migrate_distance_from_wall(pointList2,150.mm,type)
                         pointList.concat(pointList2)
                         distan = 0
@@ -1562,31 +1267,18 @@ class WaterSupplyPipeline
                             end
                         }
                         distanceSegmentList << [distan,list_item2]
+                        #不遍历distanceSegmentList
+                        list_item2.each{|items2|
+                            @lineList << items2
+                            # if type == "cold"
+                            #     @coldbrancheshash[item] = [] if @coldbrancheshash[item].nil?
+                            #     @coldbrancheshash[item] << [items2[0], items2[1]]
+                            # end
+                        }
+                        break
                     end
                 }
-                if distanceSegmentList.size > 0 
-                    all_segments_distance_min = distanceSegmentList[0][0]
-                    distanceSegmentList.each{|item2|
-                        all_segments_distance_min = item2[0] if item2[0] < all_segments_distance_min
-                    }
-                    distanceSegmentList.each{|items|
-                        if items[0] == all_segments_distance_min 
-                            items[1].each{|items2|
-                                @lineList << items2
-                                #先不画线
-                                # line = @ents.add_line items2[0], items2[1]
-                                if type == "hot"
-                                    # line.material = "red" 
-                                else
-                                    @coldbrancheshash[item] = [] if @coldbrancheshash[item].nil?
-                                    @coldbrancheshash[item] << [items2[0], items2[1]]
-                                end
-                            }
-                            break
-                        end
-                    }
-                end
-            end 
+			end
 		}
 
 		if type == "cold"
@@ -1594,7 +1286,6 @@ class WaterSupplyPipeline
 		elsif type == "hot"
 			@hotLines = @lineList
 		end
-		# @model.commit_operation
 	end 
 
 	
@@ -3089,102 +2780,61 @@ class WaterSupplyPipeline
 		face1
 	end 
 	
-	#穿墙判断
-	def judge_through_walls(point1,point2,type)
-		vec12 = [point2[0]-point1[0], point2[1]-point1[1], point2[2]-point1[2]]
-		line1 = [point1, Geom::Point3d.new(point2)]
-		distance12 = point1.distance point2
-		result = []
-		result[0] = 0
-		result[1] = []
-		flag = 0 #穿墙标志
-		@wallFaceList.each{|item2|
-			fgroup = find_max_group_by_ent(item2)
-			item2point0 = transform_obj(item2.vertices[0].position,fgroup)
-			item2point0 = [item2point0[0],item2point0[1],point1[2]]
-			plane = [item2point0, Geom::Vector3d.new(item2.normal)]
-			point_vi = Geom.intersect_line_plane(line1,plane)
+    def judge_through_walls(point1,point2,type)
+        vec12 = [point2[0]-point1[0], point2[1]-point1[1], point2[2]-point1[2]]
+        line1 = [point1, Geom::Point3d.new(point2)]
+        distance12 = point1.distance point2
+        result = []
+        result[0] = 0
+        result[1] = []
+        flag = 0 #穿墙标志
+        @wallFaceListRel.each{|item|
+            item2point0 = item.vertices[0].position
+            item2point0 = [item2point0[0],item2point0[1],point1[2]]
+            plane = [item2point0, Geom::Vector3d.new(item.normal)]
+            point_vi = Geom.intersect_line_plane(line1,plane)
 
-			if !point_vi.nil?
-				#交点在线段上并且在墙上
-				distance1_vi = point1.distance point_vi
-				distance2_vi = point2.distance point_vi
-				if fgroup != 0
-					face1 = transform_face(item2, fgroup)
-				else
-					face1 = item2
-				end 
-				if (distance1_vi <= distance12) && (distance2_vi <= distance12) && (face1.classify_point(point_vi) == 1 || face1.classify_point(point_vi) == 2 || face1.classify_point(point_vi) == 4)
-					flag = 1 
-					result[1] << item2
-				end
-				if face1 != item2
-					#删除
-					face1.edges.each{|face1Item|
-						face1Item.erase!
-					}
-				end 
-			end
-		}
-	
-		if type == "hot"
-			#增加对是否穿线穿点的判断（是否穿过冷水管）
-			flag_2 = false
-			@coldLinesPoint.each{|item|
-				flag_2 = judge_point_in_segment(item,point1,point2)
-				 if flag_2
-					flag = 1
-					result[1] << item 
-					break
-				 end 
-			}
-			# if flag != 1
-				# @coldLinesPoint.each_cons(2){|items|
-					# flag_1 = judge_point_in_segment(point1,items[0],items[1])
-					# flag_2 = judge_point_in_segment(point2,items[0],items[1])
-					 # if flag_1 || flag_2
-						# flag = 1
-						# break
-					 # end 
-				# }
-			# end
-			#线段交叉
-			# @coldLines.each{|items|
-				# flag_2 = judge_intersec_point_by_segments([point1,point2],items)
-				# if flag_2
-					# flag = 1
-				# end
-			# }
-		elsif type == "cold"
-			plist = []
-			@hotDevicePointList.each{|item|
-				plist << [item[0],item[1],0.mm]
-			}
-			flag_2 = false
-			if plist.size > 0
-				plist.each{|item|
-					flag_2 = judge_point_in_segment(item,point1,point2)
-					 if flag_2
-						flag = 1
-						result[1] << item
-						break
-					 end 
-				}
-			end
-		end			
-	
-		result[0] = flag
-			# rescue Exception => e
-				# p e.message
-				# if e.message.include?("stack level too deep")
-					# p "qq"
-					# result[0] = 0
-				# end 
-			# end 
-	
-		result
-	end
-	 
+            if !point_vi.nil?
+                #交点在线段上并且在墙上
+                distance1_vi = point1.distance point_vi
+                distance2_vi = point2.distance point_vi
+                if (distance1_vi <= distance12) && (distance2_vi <= distance12) && (item.classify_point(point_vi) == 1 || item.classify_point(point_vi) == 2 || item.classify_point(point_vi) == 4)
+                    flag = 1 
+                    result[1] << item
+                end
+            end
+        }
+        if type == "hot"
+            #增加对是否穿线穿点的判断（是否穿过冷水管）
+            flag_2 = false
+            @coldLinesPoint.each{|item2|
+                flag_2 = judge_point_in_segment(item2,point1,point2)
+                 if flag_2
+                    flag = 1
+                    result[1] << item2 
+                    break
+                 end 
+            }
+        elsif type == "cold"
+            plist = []
+            @hotDevicePointList.each{|items|
+                plist << [items[0],items[1],0.mm]
+            }
+            flag_2 = false
+            if plist.size > 0
+                plist.each{|item2|
+                    flag_2 = judge_point_in_segment(item2,point1,point2)
+                     if flag_2
+                        flag = 1
+                        result[1] << item2
+                        break
+                     end 
+                }
+            end
+        end         
+        result[0] = flag
+        result
+    end
 
 	#两点线段检索附近是否有与水管同向的过道，有的话优先从过道走
 	def search_corridor(point1, point2, distance)
@@ -3338,15 +2988,13 @@ class WaterSupplyPipeline
 end 
 
 t1 = Time.now
-p "Time.now start : #{Time.now}"
 begin
-    timeout(210) do 
+    timeout(60) do 
         WaterSupplyPipeline.new.run([0,0,1], 0.mm, 0.mm,[3020.mm, 5010.mm,0],"钢管","2","250","3.5","24")
     end 
 rescue Exception => e
     p e.message
-    p "程序执行时间已过210s，超时!"
+    p "程序执行时间已过60s，超时!"
 end 
 t2 = Time.now
-p "Time.now end : #{Time.now}"
 p "耗时：#{t2.to_i - t1.to_i}s"
